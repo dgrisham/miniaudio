@@ -236,17 +236,16 @@ MA_API ma_result ma_fdkaac_init_file(const char* pFilePath, const ma_decoding_ba
     #if !defined(MA_NO_FDKACC)
     {
     	int ret;
-        unsigned i;
-        AVFormatContext *in;
-    	AVStream *st;
+    	unsigned i;
+    	AVFormatContext *in = NULL;
+    	AVStream *st = NULL;
     	UINT input_length;
     	AAC_DECODER_ERROR err;
 
     #if LIBAVFORMAT_VERSION_MICRO < 100 || LIBAVFORMAT_VERSION_MAJOR < 58 || LIBAVFORMAT_VERSION_MINOR < 9
         av_register_all();
     #endif
-        ret = avformat_open_input(&in, pFilePath, NULL, NULL);
-        if (ret < 0) {
+        if (avformat_open_input(&in, pFilePath, NULL, NULL) < 0) {
             char buf[100];
             av_strerror(ret, buf, sizeof(buf));
             fprintf(stderr, "%s: %s\n", pFilePath, buf);
@@ -276,7 +275,8 @@ MA_API ma_result ma_fdkaac_init_file(const char* pFilePath, const ma_decoding_ba
             fprintf(stderr, "Unable to decode the ASC\n");
             return MA_INVALID_DATA;
         }
-		pAAC->info = aacDecoder_GetStreamInfo(pAAC->handle); // TODO: can we call this before decoding?
+        pAAC->info = NULL;
+    	// pAAC->info = aacDecoder_GetStreamInfo(pAAC->handle); // TODO: can we call this before decoding?
 
     	pAAC->output_size = 8*sizeof(INT_PCM)*2048;
         pAAC->decode_buf = (INT_PCM*)malloc(pAAC->output_size);
@@ -364,6 +364,14 @@ MA_API ma_result ma_fdkaac_read_pcm_frames(ma_fdkaac* pAAC, void* pFramesOut, ma
 
             valid = pkt.size;
             UINT input_length = pkt.size;
+
+        	err = aacDecoder_Fill(pAAC->handle, &pkt.data, &input_length, &valid);
+        	if (err != AAC_DEC_OK) {
+                fprintf(stderr, "Fill failed: %x\n", err);
+                result = MA_ERROR;
+                break;
+        	}
+
         	err = aacDecoder_DecodeFrame(pAAC->handle, pAAC->decode_buf, pAAC->output_size / sizeof(INT_PCM), 0);
         	av_packet_unref(&pkt);
         	if (err == AAC_DEC_NOT_ENOUGH_BITS) {
