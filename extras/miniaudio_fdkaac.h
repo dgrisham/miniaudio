@@ -449,13 +449,11 @@ MA_API ma_result ma_fdkaac_get_data_format(ma_fdkaac* pAAC, ma_format* pFormat, 
     #if !defined(MA_NO_FDKACC)
     {
         if (pChannels != NULL) {
-            if (pAAC->info == NULL) *pChannels = 2;
-            else                    *pChannels = pAAC->info->numChannels;
+            if (pAAC->info) *pChannels = pAAC->info->numChannels;
         }
 
         if (pSampleRate != NULL) {
-            if (pAAC->info == NULL) *pSampleRate = 44100;
-            else                    *pSampleRate = pAAC->info->sampleRate;
+            if (pAAC->info) *pSampleRate = pAAC->info->sampleRate;
         }
 
         if (pChannelMap != NULL) {
