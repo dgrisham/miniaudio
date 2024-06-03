@@ -121,10 +121,10 @@ int main(int argc, char** argv)
     ma_uint32 channels;
     ma_uint32 sampleRate;
 
-    // /*
-    // Add your custom backend vtables here. The order in the array defines the order of priority. The
-    // vtables will be passed in via the decoder config.
-    // */
+    /*
+    Add your custom backend vtables here. The order in the array defines the order of priority. The
+    vtables will be passed in via the decoder config.
+    */
     ma_decoding_backend_vtable* pCustomBackendVTables[] =
     {
         &g_ma_decoding_backend_vtable_fdkaac,
@@ -136,7 +136,7 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    // /* Initialize the decoder. */
+    /* Initialize the decoder. */
     decoderConfig = ma_decoder_config_init_default();
     decoderConfig.pCustomBackendUserData = NULL;  /* In this example our backend objects are contained within a ma_decoder_ex object to avoid a malloc. Our vtables need to know about this. */
     decoderConfig.ppCustomBackendVTables = pCustomBackendVTables;
@@ -151,7 +151,7 @@ int main(int argc, char** argv)
     ma_data_source_set_looping(&decoder, MA_TRUE);
 
 
-    // /* Initialize the device. */
+    /* Initialize the device. */
     result = ma_data_source_get_data_format(&decoder, &format, &channels, &sampleRate, NULL, 0);
     if (result != MA_SUCCESS) {
         printf("Failed to retrieve decoder data format.");
@@ -165,6 +165,10 @@ int main(int argc, char** argv)
     deviceConfig.sampleRate        = sampleRate;
     deviceConfig.dataCallback      = data_callback;
     deviceConfig.pUserData         = &decoder;
+
+    printf("format: %d\n", format);
+    printf("channels: %d\n", channels);
+    printf("sampleRate: %d\n", sampleRate);
 
     if (ma_device_init(NULL, &deviceConfig, &device) != MA_SUCCESS) {
         printf("Failed to open playback device.\n");
