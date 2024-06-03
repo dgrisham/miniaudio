@@ -15,6 +15,7 @@ the decoder via the decoder config (`ma_decoder_config`). You need to implement 
 of your custom decoders. See `ma_decoding_backend_vtable` for the functions you need to implement.
 The `onInitFile`, `onInitFileW` and `onInitMemory` functions are optional.
 */
+// #define MA_DEBUG_OUTPUT 1
 #define MINIAUDIO_IMPLEMENTATION
 #include "../miniaudio.h"
 #include "../extras/miniaudio_fdkaac.h"
@@ -127,7 +128,7 @@ int main(int argc, char** argv)
     */
     ma_decoding_backend_vtable* pCustomBackendVTables[] =
     {
-        &g_ma_decoding_backend_vtable_fdkaac,
+        &g_ma_decoding_backend_vtable_fdkaac
     };
 
 
@@ -150,7 +151,6 @@ int main(int argc, char** argv)
 
     ma_data_source_set_looping(&decoder, MA_TRUE);
 
-
     /* Initialize the device. */
     result = ma_data_source_get_data_format(&decoder, &format, &channels, &sampleRate, NULL, 0);
     if (result != MA_SUCCESS) {
@@ -158,26 +158,24 @@ int main(int argc, char** argv)
         ma_decoder_uninit(&decoder);
         return -1;
     }
+    result = ma_data_source_seek_to_pcm_frame(&decoder, 102400);
 
     deviceConfig = ma_device_config_init(ma_device_type_playback);
-    deviceConfig.playback.format   = format;
-    deviceConfig.playback.channels = channels;
-    deviceConfig.sampleRate        = sampleRate;
-    deviceConfig.dataCallback      = data_callback;
-    deviceConfig.pUserData         = &decoder;
-
-    printf("format: %d\n", format);
-    printf("channels: %d\n", channels);
-    printf("sampleRate: %d\n", sampleRate);
+    deviceConfig.playback.format    = format;
+    deviceConfig.playback.channels  = channels;
+    deviceConfig.sampleRate         = sampleRate;
+    deviceConfig.dataCallback       = data_callback;
+    deviceConfig.pUserData          = &decoder;
+    // deviceConfig.periodSizeInFrames = 1024;
 
     if (ma_device_init(NULL, &deviceConfig, &device) != MA_SUCCESS) {
-        printf("Failed to open playback device.\n");
+        fprintf(stderr, "Failed to open playback device.\n");
         ma_decoder_uninit(&decoder);
         return -1;
     }
 
     if (ma_device_start(&device) != MA_SUCCESS) {
-        printf("Failed to start playback device.\n");
+        fprintf(stderr, "Failed to start playback device.\n");
         ma_device_uninit(&device);
         ma_decoder_uninit(&decoder);
         return -1;
