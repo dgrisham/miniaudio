@@ -17,10 +17,6 @@ extern "C" {
 #endif
 
 #if !defined(MA_NO_FDKACC)
-// #include <stdio.h>
-// #include <stdint.h>
-// #include <unistd.h>
-// #include <stdlib.h>
 #include <libavformat/avformat.h>
 #include <fdk-aac/aacdecoder_lib.h>
 #endif
@@ -243,7 +239,6 @@ MA_API ma_result ma_fdkaac_init_file(const char* pFilePath, const ma_decoding_ba
 
     #if !defined(MA_NO_FDKACC)
     {
-    	int ret;
     	unsigned i;
     	AVFormatContext *in = NULL;
     	AVStream *st = NULL;
@@ -343,11 +338,6 @@ MA_API ma_result ma_fdkaac_read_pcm_frames(ma_fdkaac* pAAC, void* pFramesOut, ma
     {
         ma_result result = MA_SUCCESS;  /* Must be initialized to MA_SUCCESS. */
         ma_uint64 totalPCMFramesRead = 0;
-
-        ma_uint32 numChannels;
-        ma_uint32 frameSize;
-
-    	AAC_DECODER_ERROR err;
 
     	INT_PCM* pcmOut = pFramesOut;
 
