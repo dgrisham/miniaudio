@@ -472,16 +472,19 @@ MA_API ma_result ma_fdkaac_get_data_format(ma_fdkaac* pAAC, ma_format* pFormat, 
     #if !defined(MA_NO_FDKACC)
     {
         if (pChannels != NULL) {
-            *pChannels = pAAC->info->numChannels;
-            printf("OI! %d\n", *pChannels);
+            if (pAAC->info == NULL) *pChannels = 2;
+            else                    *pChannels = pAAC->info->numChannels;
+            // printf("OI! %d\n", *pChannels);
         }
 
         if (pSampleRate != NULL) {
-            *pSampleRate = pAAC->info->sampleRate;
+            if (pAAC->info == NULL) *pSampleRate = 44100;
+            else                    *pSampleRate = pAAC->info->sampleRate;
+            // printf("OI AGAIN! %d\n", *pSampleRate);
         }
 
         if (pChannelMap != NULL) {
-            ma_channel_map_init_standard(ma_standard_channel_map_fdkaac, pChannelMap, channelMapCap, pAAC->info->numChannels);
+            ma_channel_map_init_standard(ma_standard_channel_map_fdkaac, pChannelMap, channelMapCap, *pChannels);
         }
 
         return MA_SUCCESS;
