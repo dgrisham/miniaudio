@@ -4301,6 +4301,7 @@ typedef enum
     ma_standard_channel_map_rfc3551,   /* Based off AIFF. */
     ma_standard_channel_map_flac,
     ma_standard_channel_map_vorbis,
+    ma_standard_channel_map_fdkaac,
     ma_standard_channel_map_sound4,    /* FreeBSD's sound(4). */
     ma_standard_channel_map_sndio,     /* www.sndio.org/tips.html */
     ma_standard_channel_map_webaudio = ma_standard_channel_map_flac, /* https://webaudio.github.io/web-audio-api/#ChannelOrdering. Only 1, 2, 4 and 6 channels are defined, but can fill in the gaps with logical assumptions. */
@@ -54022,10 +54023,12 @@ static ma_result ma_data_converter_get_heap_layout(const ma_data_converter_confi
     MA_ZERO_OBJECT(pHeapLayout);
 
     if (pConfig == NULL) {
+            printf("TPQWE: 1111111111111111\n");
         return MA_INVALID_ARGS;
     }
 
     if (pConfig->channelsIn == 0 || pConfig->channelsOut == 0) {
+            printf("TPQWE: 2222222222222222 %d %d\n", pConfig->channelsIn, pConfig->channelsOut);
         return MA_INVALID_ARGS;
     }
 
@@ -54039,6 +54042,7 @@ static ma_result ma_data_converter_get_heap_layout(const ma_data_converter_confi
 
         result = ma_channel_converter_get_heap_size(&channelConverterConfig, &heapSizeInBytes);
         if (result != MA_SUCCESS) {
+                printf("TPQWE: 3333333333333333\n");
             return result;
         }
 
@@ -54053,6 +54057,7 @@ static ma_result ma_data_converter_get_heap_layout(const ma_data_converter_confi
 
         result = ma_resampler_get_heap_size(&resamplerConfig, &heapSizeInBytes);
         if (result != MA_SUCCESS) {
+                printf("TPQWE: 4444444444444444\n");
             return result;
         }
 
@@ -54062,6 +54067,7 @@ static ma_result ma_data_converter_get_heap_layout(const ma_data_converter_confi
     /* Make sure allocation size is aligned. */
     pHeapLayout->sizeInBytes = ma_align_64(pHeapLayout->sizeInBytes);
 
+    printf("TPQWE: 5555555555555555\n");
     return MA_SUCCESS;
 }
 
@@ -54071,6 +54077,7 @@ MA_API ma_result ma_data_converter_get_heap_size(const ma_data_converter_config*
     ma_data_converter_heap_layout heapLayout;
 
     if (pHeapSizeInBytes == NULL) {
+        printf("JDFKSL 111111111111\n");
         return MA_INVALID_ARGS;
     }
 
@@ -54078,6 +54085,7 @@ MA_API ma_result ma_data_converter_get_heap_size(const ma_data_converter_config*
 
     result = ma_data_converter_get_heap_layout(pConfig, &heapLayout);
     if (result != MA_SUCCESS) {
+        printf("JDFKSL 222222222222\n");
         return result;
     }
 
@@ -54227,12 +54235,14 @@ MA_API ma_result ma_data_converter_init(const ma_data_converter_config* pConfig,
 
     result = ma_data_converter_get_heap_size(pConfig, &heapSizeInBytes);
     if (result != MA_SUCCESS) {
+        printf("AYYHJKSDHJK 1111111111111111111\n");
         return result;
     }
 
     if (heapSizeInBytes > 0) {
         pHeap = ma_malloc(heapSizeInBytes, pAllocationCallbacks);
         if (pHeap == NULL) {
+        printf("AYYHJKSDHJK 2222222222222222222\n");
             return MA_OUT_OF_MEMORY;
         }
     } else {
@@ -54242,10 +54252,12 @@ MA_API ma_result ma_data_converter_init(const ma_data_converter_config* pConfig,
     result = ma_data_converter_init_preallocated(pConfig, pHeap, pConverter);
     if (result != MA_SUCCESS) {
         ma_free(pHeap, pAllocationCallbacks);
+        printf("AYYHJKSDHJK 3333333333333333333\n");
         return result;
     }
 
     pConverter->_ownsHeap = MA_TRUE;
+        printf("AYYHJKSDHJK 4444444444444444444\n");
     return MA_SUCCESS;
 }
 
@@ -55594,6 +55606,106 @@ static ma_channel ma_channel_map_init_standard_channel_vorbis(ma_uint32 channelC
     return MA_CHANNEL_NONE;
 }
 
+static ma_channel ma_channel_map_init_standard_channel_fdkaac(ma_uint32 channelCount, ma_uint32 channelIndex)
+{
+    switch (channelCount)
+    {
+        case 0: return MA_CHANNEL_NONE;
+
+        case 1:
+        {
+            return MA_CHANNEL_MONO;
+        } break;
+
+        case 2:
+        {
+            switch (channelIndex) {
+                case 0: return MA_CHANNEL_FRONT_LEFT;
+                case 1: return MA_CHANNEL_FRONT_RIGHT;
+            }
+        } break;
+
+        case 3:
+        {
+            switch (channelIndex) {
+                case 0: return MA_CHANNEL_FRONT_LEFT;
+                case 1: return MA_CHANNEL_FRONT_CENTER;
+                case 2: return MA_CHANNEL_FRONT_RIGHT;
+            }
+        } break;
+
+        case 4:
+        {
+            switch (channelIndex) {
+                case 0: return MA_CHANNEL_FRONT_LEFT;
+                case 1: return MA_CHANNEL_FRONT_RIGHT;
+                case 2: return MA_CHANNEL_BACK_LEFT;
+                case 3: return MA_CHANNEL_BACK_RIGHT;
+            }
+        } break;
+
+        case 5:
+        {
+            switch (channelIndex) {
+                case 0: return MA_CHANNEL_FRONT_LEFT;
+                case 1: return MA_CHANNEL_FRONT_CENTER;
+                case 2: return MA_CHANNEL_FRONT_RIGHT;
+                case 3: return MA_CHANNEL_BACK_LEFT;
+                case 4: return MA_CHANNEL_BACK_RIGHT;
+            }
+        } break;
+
+        case 6:
+        {
+            switch (channelIndex) {
+                case 0: return MA_CHANNEL_FRONT_LEFT;
+                case 1: return MA_CHANNEL_FRONT_CENTER;
+                case 2: return MA_CHANNEL_FRONT_RIGHT;
+                case 3: return MA_CHANNEL_BACK_LEFT;
+                case 4: return MA_CHANNEL_BACK_RIGHT;
+                case 5: return MA_CHANNEL_LFE;
+            }
+        } break;
+
+        case 7:
+        {
+            switch (channelIndex) {
+                case 0: return MA_CHANNEL_FRONT_LEFT;
+                case 1: return MA_CHANNEL_FRONT_CENTER;
+                case 2: return MA_CHANNEL_FRONT_RIGHT;
+                case 3: return MA_CHANNEL_SIDE_LEFT;
+                case 4: return MA_CHANNEL_SIDE_RIGHT;
+                case 5: return MA_CHANNEL_BACK_CENTER;
+                case 6: return MA_CHANNEL_LFE;
+            }
+        } break;
+
+        case 8:
+        default:
+        {
+            switch (channelIndex) {
+                case 0: return MA_CHANNEL_FRONT_LEFT;
+                case 1: return MA_CHANNEL_FRONT_CENTER;
+                case 2: return MA_CHANNEL_FRONT_RIGHT;
+                case 3: return MA_CHANNEL_SIDE_LEFT;
+                case 4: return MA_CHANNEL_SIDE_RIGHT;
+                case 5: return MA_CHANNEL_BACK_LEFT;
+                case 6: return MA_CHANNEL_BACK_RIGHT;
+                case 7: return MA_CHANNEL_LFE;
+            }
+        } break;
+    }
+
+    if (channelCount > 8) {
+        if (channelIndex < 32) {    /* We have 32 AUX channels. */
+            return (ma_channel)(MA_CHANNEL_AUX_0 + (channelIndex - 8));
+        }
+    }
+
+    /* Getting here means we don't know how to map the channel position so just return MA_CHANNEL_NONE. */
+    return MA_CHANNEL_NONE;
+}
+
 static ma_channel ma_channel_map_init_standard_channel_sound4(ma_uint32 channelCount, ma_uint32 channelIndex)
 {
     switch (channelCount)
@@ -55794,6 +55906,11 @@ static ma_channel ma_channel_map_init_standard_channel(ma_standard_channel_map s
         case ma_standard_channel_map_vorbis:
         {
             return ma_channel_map_init_standard_channel_vorbis(channelCount, channelIndex);
+        } break;
+
+        case ma_standard_channel_map_fdkaac:
+        {
+            return ma_channel_map_init_standard_channel_fdkaac(channelCount, channelIndex);
         } break;
 
         case ma_standard_channel_map_sound4:
@@ -60658,17 +60775,20 @@ static ma_result ma_decoder__init_data_converter(ma_decoder* pDecoder, const ma_
 
     result = ma_data_source_get_data_format(pDecoder->pBackend, &internalFormat, &internalChannels, &internalSampleRate, internalChannelMap, ma_countof(internalChannelMap));
     if (result != MA_SUCCESS) {
+        printf("HREHREHRE 111111111111111111111\n");
         return result;  /* Failed to retrieve the internal data format. */
     }
 
 
     /* Make sure we're not asking for too many channels. */
     if (pConfig->channels > MA_MAX_CHANNELS) {
+        printf("HREHREHRE 222222222222222222222\n");
         return MA_INVALID_ARGS;
     }
 
     /* The internal channels should have already been validated at a higher level, but we'll do it again explicitly here for safety. */
     if (internalChannels > MA_MAX_CHANNELS) {
+        printf("HREHREHRE 333333333333333333333\n");
         return MA_INVALID_ARGS;
     }
 
@@ -60706,6 +60826,7 @@ static ma_result ma_decoder__init_data_converter(ma_decoder* pDecoder, const ma_
 
     result = ma_data_converter_init(&converterConfig, &pDecoder->allocationCallbacks, &pDecoder->converter);
     if (result != MA_SUCCESS) {
+        printf("HREHREHRE 444444444444444444444\n");
         return result;
     }
 
@@ -60731,17 +60852,20 @@ static ma_result ma_decoder__init_data_converter(ma_decoder* pDecoder, const ma_
             inputCacheCapSizeInBytes = pDecoder->inputCacheCap * ma_get_bytes_per_frame(internalFormat, internalChannels);
             if (inputCacheCapSizeInBytes > MA_SIZE_MAX) {
                 ma_data_converter_uninit(&pDecoder->converter, &pDecoder->allocationCallbacks);
+                printf("HREHREHRE 555555555555555555555\n");
                 return MA_OUT_OF_MEMORY;
             }
 
             pDecoder->pInputCache = ma_malloc((size_t)inputCacheCapSizeInBytes, &pDecoder->allocationCallbacks);    /* Safe cast to size_t. */
             if (pDecoder->pInputCache == NULL) {
                 ma_data_converter_uninit(&pDecoder->converter, &pDecoder->allocationCallbacks);
+                printf("HREHREHRE 666666666666666666666\n");
                 return MA_OUT_OF_MEMORY;
             }
         }
     }
 
+printf("HREHREHRE 777777777777777777777\n");
     return MA_SUCCESS;
 }
 
@@ -64866,9 +64990,11 @@ MA_API ma_result ma_decoder_init_file(const char* pFilePath, const ma_decoder_co
     miniaudio's built-in file IO for loading file.
     */
     if (result == MA_SUCCESS) {
+        printf("UHHHHHHHHH 1111111111111111111\n");
         /* Initialization was successful. Finish up. */
         result = ma_decoder__postinit(&config, pDecoder);
         if (result != MA_SUCCESS) {
+            printf("UHHHHHHHHH 2222222222222222222\n");
             /*
             The backend was initialized successfully, but for some reason post-initialization failed. This is most likely
             due to an out of memory error. We're going to abort with an error here and not try to recover.
