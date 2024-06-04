@@ -239,6 +239,7 @@ MA_API ma_result ma_fdkaac_init_file(const char* pFilePath, const ma_decoding_ba
 
     #if !defined(MA_NO_FDKACC)
     {
+    	int ret;
     	unsigned i;
     	AVFormatContext *in = NULL;
     	AVStream *st = NULL;
@@ -248,7 +249,8 @@ MA_API ma_result ma_fdkaac_init_file(const char* pFilePath, const ma_decoding_ba
     #if LIBAVFORMAT_VERSION_MICRO < 100 || LIBAVFORMAT_VERSION_MAJOR < 58 || LIBAVFORMAT_VERSION_MINOR < 9
         av_register_all();
     #endif
-        if (avformat_open_input(&in, pFilePath, NULL, NULL) < 0) {
+        ret = avformat_open_input(&in, pFilePath, NULL, NULL);
+        if (ret < 0) {
             char buf[100];
             av_strerror(ret, buf, sizeof(buf));
             fprintf(stderr, "%s: %s\n", pFilePath, buf);
