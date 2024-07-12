@@ -598,7 +598,6 @@ typedef enum
     ma_standard_channel_map_rfc3551,   /* Based off AIFF. */
     ma_standard_channel_map_flac,
     ma_standard_channel_map_vorbis,
-    ma_standard_channel_map_fdkaac,
     ma_standard_channel_map_sound4,    /* FreeBSD's sound(4). */
     ma_standard_channel_map_sndio,     /* www.sndio.org/tips.html */
     ma_standard_channel_map_webaudio = ma_standard_channel_map_flac, /* https://webaudio.github.io/web-audio-api/#ChannelOrdering. Only 1, 2, 4 and 6 channels are defined, but can fill in the gaps with logical assumptions. */
@@ -6154,7 +6153,6 @@ typedef enum
     ma_encoding_format_wav,
     ma_encoding_format_flac,
     ma_encoding_format_mp3,
-    ma_encoding_format_m4a,
     ma_encoding_format_vorbis
 } ma_encoding_format;
 #endif
