@@ -78,14 +78,14 @@ static void ma_decoding_backend_uninit__fdkaac(void* pUserData, ma_data_source* 
     ma_free(pAAC, pAllocationCallbacks);
 }
 
-static ma_result ma_decoding_backend_get_channel_map__fdkaac(void* pUserData, ma_data_source* pBackend, ma_channel* pChannelMap, size_t channelMapCap)
-{
-    ma_fdkaac* pAAC = (ma_fdkaac*)pBackend;
+// static ma_result ma_decoding_backend_get_channel_map__fdkaac(void* pUserData, ma_data_source* pBackend, ma_channel* pChannelMap, size_t channelMapCap)
+// {
+//     ma_fdkaac* pAAC = (ma_fdkaac*)pBackend;
 
-    (void)pUserData;
+//     (void)pUserData;
 
-    return ma_fdkaac_get_data_format(pAAC, NULL, NULL, NULL, pChannelMap, channelMapCap);
-}
+//     return ma_fdkaac_get_data_format(pAAC, NULL, NULL, NULL, pChannelMap, channelMapCap);
+// }
 
 static ma_decoding_backend_vtable g_ma_decoding_backend_vtable_fdkaac =
 {
@@ -95,9 +95,6 @@ static ma_decoding_backend_vtable g_ma_decoding_backend_vtable_fdkaac =
     NULL, /* onInitMemory() */
     ma_decoding_backend_uninit__fdkaac
 };
-
-
-
 
 void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount)
 {
@@ -166,7 +163,7 @@ int main(int argc, char** argv)
     deviceConfig.sampleRate         = sampleRate;
     deviceConfig.dataCallback       = data_callback;
     deviceConfig.pUserData          = &decoder;
-    // deviceConfig.periodSizeInFrames = 1024;
+    // deviceConfig.periodSizeInFrames = 1470;
 
     if (ma_device_init(NULL, &deviceConfig, &device) != MA_SUCCESS) {
         fprintf(stderr, "Failed to open playback device.\n");
