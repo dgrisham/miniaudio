@@ -70,41 +70,68 @@ static ma_data_source_vtable g_ma_fdkaac_ds_vtable =
     ma_fdkaac_ds_get_length
 };
 
-static ma_result ma_fdkaac_init_internal(const ma_decoding_backend_config* pConfig, ma_fdkaac* pAAC)
+#if !defined(MA_NO_FDKACC)
+static int ma_fdkaac_of_callback__read(void* pUserData, unsigned char* pBufferOut, int bytesToRead)
 {
+    ma_fdkaac* pAAC = (ma_fdkaac*)pUserData;
     ma_result result;
-    ma_data_source_config dataSourceConfig;
+    size_t bytesRead;
 
-    if (pAAC == NULL) {
-        return MA_INVALID_ARGS;
-    }
+    result = pAAC->onRead(pAAC->pReadSeekTellUserData, (void*)pBufferOut, bytesToRead, &bytesRead);
 
-    MA_ZERO_OBJECT(pAAC);
-    // pAAC->format = ma_format_f32; /* f32 by default. */
-    pAAC->format = ma_format_s16; /* s16 by default. */
-
-    // if (pConfig != NULL && (pConfig->preferredFormat == ma_format_f32 || pConfig->preferredFormat == ma_format_s16)) {
-        // pAAC->format = pConfig->preferredFormat;
-    // } else {
-    //     /* Getting here means something other than f32 and s16 was specified. Just leave this unset to use the default format. */
-    // }
-
-    dataSourceConfig = ma_data_source_config_init();
-    dataSourceConfig.vtable = &g_ma_fdkaac_ds_vtable;
-
-    result = ma_data_source_init(&dataSourceConfig, &pAAC->ds);
     if (result != MA_SUCCESS) {
-        return result;  /* Failed to initialize the base data source. */
+        return -1;
     }
 
-    return MA_SUCCESS;
+    return (int)bytesRead;
 }
+
+static int64_t ma_fdkaac_of_callback__seek(void* pUserData, int64_t offset, int whence)
+{
+    ma_fdkaac* pAAC = (ma_fdkaac*)pUserData;
+    ma_result result;
+    ma_seek_origin origin;
+
+    if (whence == SEEK_SET) {
+        origin = ma_seek_origin_start;
+    } else if (whence == SEEK_END) {
+        origin = ma_seek_origin_end;
+    } else {
+        origin = ma_seek_origin_current;
+    }
+
+    result = pAAC->onSeek(pAAC->pReadSeekTellUserData, offset, origin);
+    if (result != MA_SUCCESS) {
+        return -1;
+    }
+
+    return 0;
+}
+
+// static uint64 ma_fdkaac_of_callback__tell(void* pUserData)
+// {
+//     ma_fdkaac* pAAC = (ma_fdkaac*)pUserData;
+//     ma_result result;
+//     ma_int64 cursor;
+
+//     if (pAAC->onTell == NULL) {
+//         return -1;
+//     }
+
+//     result = pAAC->onTell(pAAC->pReadSeekTellUserData, &cursor);
+//     if (result != MA_SUCCESS) {
+//         return -1;
+//     }
+
+//     return cursor;
+// }
+#endif
 
 MA_API ma_result ma_fdkaac_init(ma_read_proc onRead, ma_seek_proc onSeek, ma_tell_proc onTell, void* pReadSeekTellUserData, const ma_decoding_backend_config* pConfig, const ma_allocation_callbacks* pAllocationCallbacks, ma_fdkaac* pAAC)
 {
     ma_result result;
 
-    (void)pAllocationCallbacks; /* Can't seem to find a way to configure memory allocations in fdkaac. */
+    (void)pAllocationCallbacks; /* Can't seem to find a way to configure memory allocations in libopus. */
 
     result = ma_fdkaac_init_internal(pConfig, pAAC);
     if (result != MA_SUCCESS) {
@@ -122,7 +149,33 @@ MA_API ma_result ma_fdkaac_init(ma_read_proc onRead, ma_seek_proc onSeek, ma_tel
 
     #if !defined(MA_NO_FDKACC)
     {
- 		pAAC->handle = aacDecoder_Open(TT_MP4_RAW, 1); // TODO: can these args vary? first one in particular
+        const int iBufSize = 32 * 1024; // 32 Kb
+        char* pBuffer = (char*)ma_malloc(iBufSize, pAllocationCallbacks);
+        AVIOContext* pIOCtx = avio_alloc_context(pBuffer, iBufSize, 0, pAAC, ma_fdkaac_of_callback__read, 0, ma_fdkaac_of_callback__seek);
+
+        pAAC->in = avformat_alloc_context();
+        pAAC->in->pb = pIOCtx;
+
+ 		// pAAC->handle = aacDecoder_Open(TT_MP4_RAW, 1); // TODO: can these args vary? first one in particular
+
+        // Determining the input format:
+        ULONG ulReadBytes = 0;
+        // if(FAILED(pInStream->Read(pBuffer, iBufSize, &ulReadBytes)))
+            // Error Handling...
+
+        // Don't forget to reset the data pointer back to the beginning!
+        // if(FAILED(pInStream->Seek(0, SEEK_SET)))
+            // Error Handling...
+
+        // Now we set the ProbeData-structure for av_probe_input_format:
+        AVProbeData probeData;
+        probeData.buf = pBuffer;
+        probeData.buf_size = ulReadBytes;
+        probeData.filename = "";
+
+        // Determine the input-format:
+        pAAC->in->iformat = av_probe_input_format(&probeData, 1);
+
         return MA_SUCCESS;
     }
     #else
