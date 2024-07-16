@@ -19,6 +19,9 @@ extern "C" {
 #endif
 
 #if !defined(MA_NO_FDKACC)
+
+#define MINIAUDIO_IMPLEMENTATION
+#include "../miniaudio.h"
 #include <libavformat/avformat.h>
 #include <fdk-aac/aacdecoder_lib.h>
 #endif
@@ -69,122 +72,6 @@ static ma_data_source_vtable g_ma_fdkaac_ds_vtable =
     ma_fdkaac_ds_get_cursor,
     ma_fdkaac_ds_get_length
 };
-
-#if !defined(MA_NO_FDKACC)
-static int ma_fdkaac_of_callback__read(void* pUserData, unsigned char* pBufferOut, int bytesToRead)
-{
-    ma_fdkaac* pAAC = (ma_fdkaac*)pUserData;
-    ma_result result;
-    size_t bytesRead;
-
-    result = pAAC->onRead(pAAC->pReadSeekTellUserData, (void*)pBufferOut, bytesToRead, &bytesRead);
-
-    if (result != MA_SUCCESS) {
-        return -1;
-    }
-
-    return (int)bytesRead;
-}
-
-static int64_t ma_fdkaac_of_callback__seek(void* pUserData, int64_t offset, int whence)
-{
-    ma_fdkaac* pAAC = (ma_fdkaac*)pUserData;
-    ma_result result;
-    ma_seek_origin origin;
-
-    if (whence == SEEK_SET) {
-        origin = ma_seek_origin_start;
-    } else if (whence == SEEK_END) {
-        origin = ma_seek_origin_end;
-    } else {
-        origin = ma_seek_origin_current;
-    }
-
-    result = pAAC->onSeek(pAAC->pReadSeekTellUserData, offset, origin);
-    if (result != MA_SUCCESS) {
-        return -1;
-    }
-
-    return 0;
-}
-
-// static uint64 ma_fdkaac_of_callback__tell(void* pUserData)
-// {
-//     ma_fdkaac* pAAC = (ma_fdkaac*)pUserData;
-//     ma_result result;
-//     ma_int64 cursor;
-
-//     if (pAAC->onTell == NULL) {
-//         return -1;
-//     }
-
-//     result = pAAC->onTell(pAAC->pReadSeekTellUserData, &cursor);
-//     if (result != MA_SUCCESS) {
-//         return -1;
-//     }
-
-//     return cursor;
-// }
-#endif
-
-MA_API ma_result ma_fdkaac_init(ma_read_proc onRead, ma_seek_proc onSeek, ma_tell_proc onTell, void* pReadSeekTellUserData, const ma_decoding_backend_config* pConfig, const ma_allocation_callbacks* pAllocationCallbacks, ma_fdkaac* pAAC)
-{
-    ma_result result;
-
-    (void)pAllocationCallbacks; /* Can't seem to find a way to configure memory allocations in libopus. */
-
-    result = ma_fdkaac_init_internal(pConfig, pAAC);
-    if (result != MA_SUCCESS) {
-        return result;
-    }
-
-    if (onRead == NULL || onSeek == NULL) {
-        return MA_INVALID_ARGS; /* onRead and onSeek are mandatory. */
-    }
-
-    pAAC->onRead = onRead;
-    pAAC->onSeek = onSeek;
-    pAAC->onTell = onTell;
-    pAAC->pReadSeekTellUserData = pReadSeekTellUserData;
-
-    #if !defined(MA_NO_FDKACC)
-    {
-        const int iBufSize = 32 * 1024; // 32 Kb
-        char* pBuffer = (char*)ma_malloc(iBufSize, pAllocationCallbacks);
-        AVIOContext* pIOCtx = avio_alloc_context(pBuffer, iBufSize, 0, pAAC, ma_fdkaac_of_callback__read, 0, ma_fdkaac_of_callback__seek);
-
-        pAAC->in = avformat_alloc_context();
-        pAAC->in->pb = pIOCtx;
-
- 		// pAAC->handle = aacDecoder_Open(TT_MP4_RAW, 1); // TODO: can these args vary? first one in particular
-
-        // Determining the input format:
-        ULONG ulReadBytes = 0;
-        // if(FAILED(pInStream->Read(pBuffer, iBufSize, &ulReadBytes)))
-            // Error Handling...
-
-        // Don't forget to reset the data pointer back to the beginning!
-        // if(FAILED(pInStream->Seek(0, SEEK_SET)))
-            // Error Handling...
-
-        // Now we set the ProbeData-structure for av_probe_input_format:
-        AVProbeData probeData;
-        probeData.buf = pBuffer;
-        probeData.buf_size = ulReadBytes;
-        probeData.filename = "";
-
-        // Determine the input-format:
-        pAAC->in->iformat = av_probe_input_format(&probeData, 1);
-
-        return MA_SUCCESS;
-    }
-    #else
-    {
-        /* fdkaac is disabled. */
-        return MA_NOT_IMPLEMENTED;
-    }
-    #endif
-}
 
 // Decodes a single AAC frame and stores the result in pAAC->decode_buf. This always writes from the start of the
 // buffer and doesn't care if there's data in it already. After decoding the frame this queries the AAC decoder
@@ -246,6 +133,276 @@ ma_result decode_one_aac_frame(ma_fdkaac* pAAC) {
         break;
     }
     return result;
+}
+
+static ma_result ma_fdkaac_init_internal(const ma_decoding_backend_config* pConfig, ma_fdkaac* pAAC)
+{
+    ma_result result;
+    ma_data_source_config dataSourceConfig;
+
+    if (pAAC == NULL) {
+        return MA_INVALID_ARGS;
+    }
+
+    MA_ZERO_OBJECT(pAAC);
+    // pAAC->format = ma_format_f32; /* f32 by default. */
+    pAAC->format = ma_format_s16; /* s16 by default. */
+
+    // if (pConfig != NULL && (pConfig->preferredFormat == ma_format_f32 || pConfig->preferredFormat == ma_format_s16)) {
+        // pAAC->format = pConfig->preferredFormat;
+    // } else {
+    //     /* Getting here means something other than f32 and s16 was specified. Just leave this unset to use the default format. */
+    // }
+
+    dataSourceConfig = ma_data_source_config_init();
+    dataSourceConfig.vtable = &g_ma_fdkaac_ds_vtable;
+
+    result = ma_data_source_init(&dataSourceConfig, &pAAC->ds);
+    if (result != MA_SUCCESS) {
+        return result;  /* Failed to initialize the base data source. */
+    }
+
+    return MA_SUCCESS;
+}
+
+#if !defined(MA_NO_FDKACC)
+static int ma_fdkaac_of_callback__read(void* pUserData, unsigned char* pBufferOut, int bytesToRead)
+{
+    ma_result result;
+    ma_fdkaac* pAAC = (ma_fdkaac*)pUserData;
+    size_t bytesRead;
+
+    result = pAAC->onRead(pAAC->pReadSeekTellUserData, (void*)pBufferOut, bytesToRead, &bytesRead);
+    if (result != MA_SUCCESS) {
+        if (result == MA_AT_END) {
+            return AVERROR_EOF;
+        }
+        return -1;
+    }
+
+	printf("bytesRead: %d\n", (int)bytesRead);
+    return (int)bytesRead;
+}
+
+static int64_t ma_fdkaac_of_callback__seek(void* pUserData, int64_t offset, int whence)
+{
+    ma_fdkaac* pAAC = (ma_fdkaac*)pUserData;
+    ma_result result;
+    ma_seek_origin origin;
+
+    if (whence == SEEK_SET) {
+        origin = ma_seek_origin_start;
+    } else if (whence == SEEK_END) {
+        origin = ma_seek_origin_end;
+    } else if (whence == AVSEEK_SIZE) {
+
+		printf("pAAC->in->pb->seekable: %d\n", pAAC->in->pb->seekable);
+		printf("pAAC->in->pb->buffer_size: %d\n", pAAC->in->pb->buffer_size);
+        int64_t pos = pAAC->in->pb->pos;
+        int ret = avio_seek(pAAC->in->pb, 0L, SEEK_END);
+        if (ret < 0) {
+            char buf[100];
+            av_strerror(ret, buf, sizeof(buf));
+            fprintf(stderr, "avio_seek to end failed: %s\n", buf);
+            // return MA_INVALID_FILE;
+            return -1;
+        }
+        int fsize = avio_tell(pAAC->in->pb);
+        printf("fsize: %d\n");
+        return fsize;
+
+
+		// int original = pAAC->in->pb->pos;
+  //       result = pAAC->onSeek(pAAC->pReadSeekTellUserData, 0, ma_seek_origin_end);
+  //       if (result != MA_SUCCESS) {
+  //           if (result == MA_AT_END) {
+  //               printf("HERE 1\n");
+  //               return pAAC->in->pb->pos;
+  //           }
+  //           return -1;
+  //       }
+		// int fsize = pAAC->in->pb->pos;
+  //       result = pAAC->onSeek(pAAC->pReadSeekTellUserData, original, ma_seek_origin_start);
+  //       if (result != MA_SUCCESS) {
+  //           return -1;
+  //       }
+        // return fsize;
+
+        // printf("AVSEEK_SIZE: %d\n", fsize);
+        // return 177635;
+        return -1;
+    } else {
+        origin = ma_seek_origin_current;
+    }
+
+    result = pAAC->onSeek(pAAC->pReadSeekTellUserData, offset, origin);
+    if (result != MA_SUCCESS) {
+            if (result == MA_AT_END) {
+                printf("HERE 2\n");
+                return pAAC->in->pb->pos;
+            }
+        return -1;
+    }
+
+    return pAAC->in->pb->pos;
+
+	// TODO: return num bytes
+	// ma_uint64 cursor;
+ //    result = ma_fdkaac_get_cursor_in_pcm_frames(pAAC, &cursor);
+ //    if (result != MA_SUCCESS) {
+ //        return -1;
+ //    }
+ //    printf("cursor: %d\n", cursor);
+    // return cursor;
+}
+
+// static uint64 ma_fdkaac_of_callback__tell(void* pUserData)
+// {
+//     ma_fdkaac* pAAC = (ma_fdkaac*)pUserData;
+//     ma_result result;
+//     ma_int64 cursor;
+
+//     if (pAAC->onTell == NULL) {
+//         return -1;
+//     }
+
+//     result = pAAC->onTell(pAAC->pReadSeekTellUserData, &cursor);
+//     if (result != MA_SUCCESS) {
+//         return -1;
+//     }
+
+//     return cursor;
+// }
+#endif
+
+MA_API ma_result ma_fdkaac_init(ma_read_proc onRead, ma_seek_proc onSeek, ma_tell_proc onTell, void* pReadSeekTellUserData, const ma_decoding_backend_config* pConfig, const ma_allocation_callbacks* pAllocationCallbacks, ma_fdkaac* pAAC)
+{
+    ma_result result;
+
+    (void)pAllocationCallbacks; /* Can't seem to find a way to configure memory allocations in libopus. */
+	// TODO: pAllocationCallbacks can be set in pConfig (if necessary)
+	// pAllocationCallbacks->onMalloc = av_malloc;
+
+    result = ma_fdkaac_init_internal(pConfig, pAAC);
+    if (result != MA_SUCCESS) {
+        return result;
+    }
+
+    if (onRead == NULL || onSeek == NULL) {
+        return MA_INVALID_ARGS; /* onRead and onSeek are mandatory. */
+    }
+
+    pAAC->onRead = onRead;
+    pAAC->onSeek = onSeek;
+    pAAC->onTell = onTell;
+    pAAC->pReadSeekTellUserData = pReadSeekTellUserData;
+
+    #if !defined(MA_NO_FDKACC)
+    {
+        const int iBufSize = 32 * 1024; // 32 Kb
+        // char* pBuffer = (char*)ma_malloc(iBufSize, pAllocationCallbacks);
+        char* pBuffer = (char*)av_malloc(iBufSize);
+        AVIOContext* pIOCtx = avio_alloc_context(pBuffer, iBufSize, 0, pAAC, ma_fdkaac_of_callback__read, 0, ma_fdkaac_of_callback__seek);
+        if (pIOCtx == NULL) {
+            fprintf(stderr, "Failed to allocated AVIO context\n");
+            return MA_ERROR;
+        }
+
+        pAAC->in = avformat_alloc_context();
+        pAAC->in->pb = pIOCtx;
+
+
+        // Determining the input format:
+        // long unsigned int ulReadBytes ulReadBytes = pAAC->onRead(pAAC->pReadSeekTellUserData, (void*)pBuffer, iBufSize, &ulReadBytes);
+        int ulReadBytes = ma_fdkaac_of_callback__read((void*)pAAC, pBuffer, iBufSize);
+        if (ulReadBytes < 0) {
+            fprintf(stderr, "Initial read failed\n");
+            return MA_ERROR;
+        }
+        // printf("pAAC->in->pb->file_size %d\n", pAAC->in->pb->file_size);
+
+        // Don't forget to reset the data pointer back to the beginning!
+        if (ma_fdkaac_of_callback__seek((void*)pAAC, 0, SEEK_SET) < 0) {
+            fprintf(stderr, "Initial seek failed\n");
+            return MA_ERROR;
+        }
+
+        // Now we set the ProbeData-structure for av_probe_input_format:
+        AVProbeData probeData;
+        probeData.buf = pBuffer;
+        probeData.buf_size = ulReadBytes;
+        probeData.filename = "";
+
+        // Determine the input-format:
+        pAAC->in->iformat = av_probe_input_format(&probeData, 1);
+        // pAAC->in->iformat = av_find_input_format("m4a");
+        // printf("AFTER pAAC->in->iformat: '%s'\n", pAAC->in->iformat->long_name);
+
+        // pAAC->in->flags = AVFMT_FLAG_CUSTOM_IO | AVFMT_FLAG_GENPTS | AVFMT_FLAG_DISCARD_CORRUPT;
+        pAAC->in->flags = AVFMT_FLAG_CUSTOM_IO;
+
+		int ret;
+
+        ret = avformat_open_input(&pAAC->in, NULL, NULL, NULL);
+        // if (avformat_open_input(&pAAC->in, "", 0, 0) != 0) {
+        if (ret != 0) {
+            char buf[100];
+            av_strerror(ret, buf, sizeof(buf));
+            fprintf(stderr, "avformat_open_input failed: %s\n", buf);
+            // return MA_INVALID_FILE;
+            return MA_ERROR;
+        }
+
+ 		// pAAC->handle = aacDecoder_Open(TT_MP4_RAW, 1); // TODO: can these args vary? first one in particular
+
+    	unsigned i;
+    	AVStream *st = NULL;
+    	UINT input_length;
+    	AAC_DECODER_ERROR err;
+
+        for (i = 0; i < pAAC->in->nb_streams && !st; i++) {
+            if (pAAC->in->streams[i]->codecpar->codec_id == AV_CODEC_ID_AAC)
+                st = pAAC->in->streams[i];
+        }
+        if (!st) {
+            fprintf(stderr, "No AAC stream found\n");
+            return MA_INVALID_DATA;
+        }
+        if (!st->codecpar->extradata_size) {
+            fprintf(stderr, "No AAC ASC found\n");
+            return MA_INVALID_DATA;
+        }
+
+        if (pAAC->handle == NULL) {
+     		pAAC->handle = aacDecoder_Open(TT_MP4_RAW, 1); // TODO: can these args vary? first one in particular
+        }
+        pAAC->pcm_frame_cursor = 0;
+        // pAAC->in = in;
+        pAAC->st = st;
+    	input_length = st->codecpar->extradata_size;
+        err = aacDecoder_ConfigRaw(pAAC->handle, &st->codecpar->extradata, &input_length);
+        if (err != AAC_DEC_OK) {
+            fprintf(stderr, "Unable to decode the ASC\n");
+            return MA_INVALID_DATA;
+        }
+        pAAC->info = NULL;
+
+    	pAAC->decode_buf_size = 8*2048*sizeof(INT_PCM); // larger than we probably need (maybe 2048 * 2 * sizeof(INT_PCM) is more realistic?)
+    													// HE-AAC maxes at 2048 PCM frames in one AAC frame * 2 channels (maybe the example
+    													// used 8 for 7.1 surround?)
+        pAAC->decode_buf = (INT_PCM*)ma_malloc(pAAC->decode_buf_size, pAllocationCallbacks);
+        pAAC->decode_buf_start = -1; // -1 means we don't currently have any valid data in the buffer
+
+        // loads one frame into the buffer and initializes pAAC->info (so we have number of channels / etc.)
+        return decode_one_aac_frame(pAAC);
+        // return MA_SUCCESS;
+    }
+    #else
+    {
+        /* fdkaac is disabled. */
+        return MA_NOT_IMPLEMENTED;
+    }
+    #endif
 }
 
 MA_API ma_result ma_fdkaac_init_file(const char* pFilePath, const ma_decoding_backend_config* pConfig, const ma_allocation_callbacks* pAllocationCallbacks, ma_fdkaac* pAAC)
@@ -632,6 +789,8 @@ MA_API void ma_decoding_backend_uninit__fdkaac(void* pUserData, ma_data_source* 
 
     (void)pUserData;
 
+
+	// TODO: call avformat_close_input here ?
     ma_fdkaac_uninit(pAAC, pAllocationCallbacks);
     ma_free(pAAC, pAllocationCallbacks);
 }

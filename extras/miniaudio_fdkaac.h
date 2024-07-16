@@ -17,6 +17,7 @@ extern "C" {
 #endif
 
 #if !defined(MA_NO_FDKACC)
+#include "../miniaudio.h"
 #include <libavformat/avformat.h>
 #include <fdk-aac/aacdecoder_lib.h>
 #endif
@@ -33,6 +34,7 @@ typedef struct
     HANDLE_AACDECODER handle;
     AVFormatContext *in;
 	AVStream *st;
+	int fsize;
 
     INT_PCM *decode_buf;
     int decode_buf_size; // total size of the decode buffer
