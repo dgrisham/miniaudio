@@ -180,7 +180,6 @@ static int ma_fdkaac_of_callback__read(void* pUserData, unsigned char* pBufferOu
         return -1;
     }
 
-	printf("bytesRead: %d\n", (int)bytesRead);
     return (int)bytesRead;
 }
 
@@ -195,65 +194,23 @@ static int64_t ma_fdkaac_of_callback__seek(void* pUserData, int64_t offset, int 
     } else if (whence == SEEK_END) {
         origin = ma_seek_origin_end;
     } else if (whence == AVSEEK_SIZE) {
-
-		printf("pAAC->in->pb->seekable: %d\n", pAAC->in->pb->seekable);
-		printf("pAAC->in->pb->buffer_size: %d\n", pAAC->in->pb->buffer_size);
-        int64_t pos = pAAC->in->pb->pos;
-        int ret = avio_seek(pAAC->in->pb, 0L, SEEK_END);
-        if (ret < 0) {
-            char buf[100];
-            av_strerror(ret, buf, sizeof(buf));
-            fprintf(stderr, "avio_seek to end failed: %s\n", buf);
-            // return MA_INVALID_FILE;
-            return -1;
-        }
-        int fsize = avio_tell(pAAC->in->pb);
-        printf("fsize: %d\n");
-        return fsize;
-
-
-		// int original = pAAC->in->pb->pos;
-  //       result = pAAC->onSeek(pAAC->pReadSeekTellUserData, 0, ma_seek_origin_end);
-  //       if (result != MA_SUCCESS) {
-  //           if (result == MA_AT_END) {
-  //               printf("HERE 1\n");
-  //               return pAAC->in->pb->pos;
-  //           }
-  //           return -1;
-  //       }
-		// int fsize = pAAC->in->pb->pos;
-  //       result = pAAC->onSeek(pAAC->pReadSeekTellUserData, original, ma_seek_origin_start);
-  //       if (result != MA_SUCCESS) {
-  //           return -1;
-  //       }
-        // return fsize;
-
-        // printf("AVSEEK_SIZE: %d\n", fsize);
-        // return 177635;
-        return -1;
+        return pAAC->fsize;
+        // need to return the file size here, and not actually seek
+        // return -1;
     } else {
         origin = ma_seek_origin_current;
     }
 
     result = pAAC->onSeek(pAAC->pReadSeekTellUserData, offset, origin);
     if (result != MA_SUCCESS) {
-            if (result == MA_AT_END) {
-                printf("HERE 2\n");
-                return pAAC->in->pb->pos;
-            }
+        if (result == MA_AT_END) {
+            printf("HERE 2\n");
+            return pAAC->in->pb->pos;
+        }
         return -1;
     }
 
     return pAAC->in->pb->pos;
-
-	// TODO: return num bytes
-	// ma_uint64 cursor;
- //    result = ma_fdkaac_get_cursor_in_pcm_frames(pAAC, &cursor);
- //    if (result != MA_SUCCESS) {
- //        return -1;
- //    }
- //    printf("cursor: %d\n", cursor);
-    // return cursor;
 }
 
 // static uint64 ma_fdkaac_of_callback__tell(void* pUserData)
@@ -297,6 +254,25 @@ MA_API ma_result ma_fdkaac_init(ma_read_proc onRead, ma_seek_proc onSeek, ma_tel
     pAAC->onTell = onTell;
     pAAC->pReadSeekTellUserData = pReadSeekTellUserData;
 
+    result = onSeek(pReadSeekTellUserData, 0L, SEEK_END);
+    if (result != MA_SUCCESS) {
+        fprintf(stderr, "Failed to seek to end of file with onSeek\n");
+        return MA_ERROR;
+    }
+    ma_int64 fsize;
+    result = onTell(pReadSeekTellUserData, &fsize);
+    printf("fsize: %d\n", fsize);
+    if (result != MA_SUCCESS) {
+        fprintf(stderr, "Failed to get filesize with onTell\n");
+        return MA_ERROR;
+    }
+    pAAC->fsize = fsize;
+    result = onSeek(pReadSeekTellUserData, 0L, SEEK_SET);
+    if (result != MA_SUCCESS) {
+        fprintf(stderr, "Failed to seek back to start of file with onSeek\n");
+        return MA_ERROR;
+    }
+
     #if !defined(MA_NO_FDKACC)
     {
         const int iBufSize = 32 * 1024; // 32 Kb
@@ -310,7 +286,6 @@ MA_API ma_result ma_fdkaac_init(ma_read_proc onRead, ma_seek_proc onSeek, ma_tel
 
         pAAC->in = avformat_alloc_context();
         pAAC->in->pb = pIOCtx;
-
 
         // Determining the input format:
         // long unsigned int ulReadBytes ulReadBytes = pAAC->onRead(pAAC->pReadSeekTellUserData, (void*)pBuffer, iBufSize, &ulReadBytes);
